@@ -10,6 +10,8 @@ import plotly.graph_objects as go
 import pandas_datareader as datas
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
+from urllib.request import urlopen, Request
+from bs4 import BeautifulSoup
 
 
 class color:
@@ -24,44 +26,6 @@ class color:
     UNDERLINE = '\033[4m'
     END = '\033[0m'
 
-
-# Считываем данные
-sp500_list = pd.read_csv('SP500_list.csv')
-ticker = st.selectbox('Select the ticker if present in the S&P 500 index', sp500_list['Symbol'], index=30).upper()
-pivot_sector = True
-checkbox_noSP = st.checkbox('Select this box to write the ticker (if not present in the S&P 500 list). \
-                            Deselect to come back to the S&P 500 index stock list')
-if checkbox_noSP:
-    ticker = st.text_input('Write the ticker (check it in yahoo finance)', 'MN.MI').upper()
-    pivot_sector = False
-
-# Задаем диапазон дат
-start = st.text_input('Enter the start date in yyyy-mm-dd format:', '2021-01-01')
-today = date.today()
-today = today.strftime('%Y-%m-%d')
-end = st.text_input('Enter the end date in yyyy-mm-dd format:', 'today')
-
-ticker_meta = yf.Ticker(ticker)
-
-series_info = pd.Series(ticker_meta.info)
-series_info = series_info.loc[['symbol', 'shortName', 'financialCurrency', 'longBusinessSummary', 'sector', 'country',
-                               'exchangeTimezoneName', 'currency', 'quoteType']]
-# test = series_info.astype(str)
-# st.dataframe(test)
-
-# Основная инфа о компании
-translator = Translator()
-st.write(translator.translate(text=series_info[3], src='en', dest='ru'))
-
-col1, col2, col3 = st.columns(3)
-col1.metric("Тикер", series_info[0])
-col2.metric("Название", series_info[1])
-col3.metric("Сектор", series_info[4])
-
-col4, col5, col6 = st.columns(3)
-col1.metric("Страна", series_info[5])
-col2.metric("Биржа", series_info[6])
-col3.metric("Валюта", series_info[7])
 
 
 # Стиль
@@ -127,10 +91,10 @@ def moving_avarage(name, start_data, end_data):
 def Reinforcement_learning(name):
     pass
 
-def Machine_learning(name, end):
+def Machine_learning(name, today):
 
     # Get the stock data, starting from 2000-01-01 to today
-    df = datas.DataReader(name, 'yahoo', '2000-01-01', end)
+    df = datas.DataReader(name, 'yahoo', '2000-01-01', today)
     # For the prediction we only need the column/variable "Adj Close"
     df = df[['Adj Close']]
 
@@ -145,7 +109,7 @@ def Machine_learning(name, end):
 
     # Creating independent data set "X"
     # For the independent data we dont need the column "Prediction"
-    X = df.drop(['Prediction'], 1)
+    X = df.drop(['Prediction'], axis = 1)
     # Convert the data into a numpy array
     X = np.array(X)
     # Remove the last "n" rows
@@ -171,7 +135,7 @@ def Machine_learning(name, end):
     # We dont need the column 'Prediction'
     # Convert the data into a numpy array
     # We want the last 30 rows
-    forecast = np.array(df.drop(['Prediction'], 1))[-n:]
+    forecast = np.array(df.drop(['Prediction'], axis=1))[-n:]
 
     # Print the predictions for the next "n" days
     # "lr_prediction" contains the price values, which the Linear Regression Model has predicted for the next "n" (30) days
@@ -229,12 +193,37 @@ def Machine_learning(name, end):
     st.write(fig)
 
 
+def get_fundamental_data(name):
+    metric = ['P/B',
+              'P/E',
+              'Forward P/E',
+              'PEG',
+              'Debt/Eq',
+              'EPS (ttm)',
+              'Dividend %',
+              'ROE',
+              'ROI',
+              'EPS Q/Q',
+              'Insider Own'
+              ]
+    df = pd.DataFrame(index=[name], columns=metric)
+    def fundamental_metric(soup, metric):
+        return soup.find(text=metric).find_next(class_='snapshot-td2').text
+    for symbol in df.index:
+        try:
+            url = ("http://finviz.com/quote.ashx?t=" + name.lower())
+            req = Request(url=url,headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:20.0) Gecko/20100101 Firefox/20.0'})
+            response = urlopen(req)
+            soup = BeautifulSoup(response)
+            for m in df.columns:
+                df.loc[symbol,m] = fundamental_metric(soup,m)
+        except Exception as e:
+            print (symbol, 'not found')
+    st.write(df)
+
+
 # Мнения аналитиков
-def analysis(name):
-    # Save the date of today in the variable "today"
-    today = date.today()
-    # We convert the type of the variable in the format %Y-%m-%d
-    today = today.strftime('%Y-%m-%d')
+def analysis(name, today):
     # Save the date of today 6 months ago, by subtracting 6 months from the date of today
     six_months = date.today() - relativedelta(months=+6)
     six_months = six_months.strftime('%Y-%m-%d')
@@ -242,17 +231,13 @@ def analysis(name):
     data = yf.Ticker(name)
     # Save the Analyst Recommendations in "rec"
     Analitics_rec = data.recommendations
+    if Analitics_rec.empty:
+        st.write("> Unfortunately, there are no recommendations by analysts provided for your chosen stock!")
     # The DataFrame "rec" has 4 columns: "Firm", "To Grade", "From Grade" and "Action"
     # The index is the date ("DatetimeIndex")
     # Now we select only those columns which have the index(date) from "six months" to "today"
-    Analitics_rec = Analitics_rec.loc[six_months:today, ]
-
-    # Unfortunately in some cases no data is available, so that the DataFrame is empty. Then the user gets the following message
-    if Analitics_rec.empty:
-        st.write("> Unfortunately, there are no recommendations by analysts provided for your chosen stock!")
-
-
     else:
+        Analitics_rec = Analitics_rec.loc[six_months:today, ]
         st.write(Analitics_rec)
         # Replace the index with simple sequential numbers and save the old index ("DatetimeIndex") as a variable "Date"
         rec = Analitics_rec.reset_index()
@@ -283,14 +268,56 @@ def analysis(name):
         st.pyplot(fig1)
 
 
-def plot_data():
-    pass
 
 
 def main():
-    moving_avarage(ticker, start, end)
-    Machine_learning(ticker, today)
-    analysis(ticker)
+    sp500_list = pd.read_csv('SP500_list.csv')
+    ticker = st.selectbox('Select the ticker if present in the S&P 500 index', sp500_list['Symbol'], index=26).upper()
+    pivot_sector = True
+    checkbox_noSP = st.checkbox('Select this box to write the ticker (if not present in the S&P 500 list). \
+                                Deselect to come back to the S&P 500 index stock list')
+    if checkbox_noSP:
+        ticker = st.text_input('Write the ticker (check it in yahoo finance)', 'MN.MI').upper()
+        pivot_sector = False
+
+    # Задаем диапазон дат
+    start = st.text_input('Enter the start date in yyyy-mm-dd format:', '2021-01-01')
+    today = date.today()
+    today = today.strftime('%Y-%m-%d')
+    end = st.text_input('Enter the end date in yyyy-mm-dd format:', today)
+
+    try:
+        ticker_meta = yf.Ticker(ticker)
+
+        series_info = pd.Series(ticker_meta.info)
+        series_info = series_info.loc[
+            ['symbol', 'shortName', 'financialCurrency', 'longBusinessSummary', 'sector', 'country',
+             'exchangeTimezoneName', 'currency', 'quoteType']]
+        # test = series_info.astype(str)
+        # st.dataframe(test)
+
+        # Основная инфа о компании
+        translator = Translator()
+        st.write(translator.translate(text=series_info[3], src='en', dest='ru'))
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Тикер", series_info[0])
+        col2.metric("Название", series_info[1])
+        col3.metric("Сектор", series_info[4])
+
+        col4, col5, col6 = st.columns(3)
+        col1.metric("Страна", series_info[5])
+        col2.metric("Биржа", series_info[6])
+        col3.metric("Валюта", series_info[7])
+
+        moving_avarage(ticker, start, end)
+        Machine_learning(ticker, today)
+        get_fundamental_data(ticker)
+        analysis(ticker, today)
+
+    except KeyError:
+        st.write('Try to input correct name')
+
 
 
 if __name__ == '__main__':
