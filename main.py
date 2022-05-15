@@ -14,18 +14,6 @@ from urllib.request import urlopen, Request
 from bs4 import BeautifulSoup
 
 
-class color:
-    PURPLE = '\033[95m'
-    CYAN = '\033[96m'
-    DARKCYAN = '\033[36m'
-    BLUE = '\033[94m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-    END = '\033[0m'
-
 
 
 # Стиль
@@ -192,6 +180,8 @@ def Machine_learning(name, today):
 
     st.write(fig)
 
+def fundamental_metric(soup, metric):
+    return soup.find(text=metric).find_next(class_='snapshot-td2').text
 
 def get_fundamental_data(name):
     metric = ['P/B',
@@ -204,22 +194,58 @@ def get_fundamental_data(name):
               'ROE',
               'ROI',
               'EPS Q/Q',
-              'Insider Own'
               ]
     df = pd.DataFrame(index=[name], columns=metric)
-    def fundamental_metric(soup, metric):
-        return soup.find(text=metric).find_next(class_='snapshot-td2').text
-    for symbol in df.index:
-        try:
-            url = ("http://finviz.com/quote.ashx?t=" + name.lower())
-            req = Request(url=url,headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:20.0) Gecko/20100101 Firefox/20.0'})
-            response = urlopen(req)
-            soup = BeautifulSoup(response)
-            for m in df.columns:
-                df.loc[symbol,m] = fundamental_metric(soup,m)
-        except Exception as e:
-            print (symbol, 'not found')
-    st.write(df)
+    try:
+        url = ("http://finviz.com/quote.ashx?t=" + name.lower())
+        req = Request(url=url,headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:20.0) Gecko/20100101 Firefox/20.0'})
+        response = urlopen(req)
+        soup = BeautifulSoup(response)
+        for m in df.columns:
+            df.loc[name,m] = fundamental_metric(soup,m)
+        st.write(df)
+        print(df)
+    except Exception as e:
+        st.write(name, 'not found')
+    df1 = df
+    df1['Dividend %'] = df1['Dividend %'].str.replace('%', '')
+    df1['ROE'] = df1['ROE'].str.replace('%', '')
+    df1['ROI'] = df1['ROI'].str.replace('%', '')
+    df1['EPS Q/Q'] = df1['EPS Q/Q'].str.replace('%', '')
+    df1 = df1.apply(pd.to_numeric, errors='coerce')
+    if (df1['P/E'].astype(float) > 5).any() == True:
+        print('kek')
+    else:
+        print('re')
+    if (df1['P/B'].astype(float) > 5).any() == True:
+        print('kek1')
+    else:
+        print('re')
+    if (df1['Dividend %'].astype(float) == 0).any() == False:
+        print('Компания не выплачивает дивиденды')
+    else:
+        print(f'Дивидендная доходность составляет:{df1["Dividend %"]}')
+    if (df1['ROI'].astype(float) > 5).any() == True:
+        print('Показатель в норме')
+    else:
+        print('Ляля')
+    if (df1['ROE'].astype(float) > 5).any() == True:
+        print('Показатель в норме')
+    else:
+        print('Ляля')
+    if (df1['ROE'].astype(float) > 5).any() == True:
+        print('Показатель в норме')
+    else:
+        print('Ляля')
+    if (df1['EPS Q/Q'].astype(float) > 5).any() == True:
+        print('Показатель в норме')
+    else:
+        print('Ляля')
+    if (df1['Debt/Eq'].astype(float) > 5).any() == True:
+        print('kek')
+    else:
+        print('lol')
+
 
 
 # Мнения аналитиков
@@ -231,41 +257,44 @@ def analysis(name, today):
     data = yf.Ticker(name)
     # Save the Analyst Recommendations in "rec"
     Analitics_rec = data.recommendations
-    if Analitics_rec.empty:
+    try:
+        if Analitics_rec.empty:
+            st.write("> Unfortunately, there are no recommendations by analysts provided for your chosen stock!")
+        # The DataFrame "rec" has 4 columns: "Firm", "To Grade", "From Grade" and "Action"
+        # The index is the date ("DatetimeIndex")
+        # Now we select only those columns which have the index(date) from "six months" to "today"
+        else:
+            Analitics_rec = Analitics_rec.loc[six_months:today, ]
+            st.write(Analitics_rec)
+            # Replace the index with simple sequential numbers and save the old index ("DatetimeIndex") as a variable "Date"
+            rec = Analitics_rec.reset_index()
+
+            # For our analysis we don't need the variables/columns "Firm", "From Grade" and "Action", therefore we delete them
+            rec.drop(['Firm', 'From Grade', 'Action'], axis=1, inplace=True)
+
+            # We change the name of the variables/columns
+            rec.columns = (['date', 'grade'])
+
+            # Now we add a new variable/column "value", which we give the value 1 for each row in order to sum up the values based on the contents of "grade"
+            rec['value'] = 1
+
+            # Now we group by the content of "grade" and sum their respective values
+            rec = rec.groupby(['grade']).sum()
+            # The DataFrame "rec" has now 1 variable/column which is the value, the index are the different names from the variable "grade"
+            # However for the plotting we need the index as a variable
+            rec = rec.reset_index()
+
+            # For the labels we assign the content/names of the variable "grade" and for the values we assign the content of "values"
+            st.write(f'Analyst Recommendations of {name} Stock from {six_months} to {today}')
+            fig1, ax1 = plt.subplots(figsize=(16,9))
+            fig1.patch.set_facecolor('#0e1117')
+            ax1.pie(rec.value, labels=rec.grade, autopct='%1.1f%%', startangle=90)
+            ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+            plt.legend(labels=rec.grade)
+
+            st.pyplot(fig1)
+    except AttributeError:
         st.write("> Unfortunately, there are no recommendations by analysts provided for your chosen stock!")
-    # The DataFrame "rec" has 4 columns: "Firm", "To Grade", "From Grade" and "Action"
-    # The index is the date ("DatetimeIndex")
-    # Now we select only those columns which have the index(date) from "six months" to "today"
-    else:
-        Analitics_rec = Analitics_rec.loc[six_months:today, ]
-        st.write(Analitics_rec)
-        # Replace the index with simple sequential numbers and save the old index ("DatetimeIndex") as a variable "Date"
-        rec = Analitics_rec.reset_index()
-
-        # For our analysis we don't need the variables/columns "Firm", "From Grade" and "Action", therefore we delete them
-        rec.drop(['Firm', 'From Grade', 'Action'], axis=1, inplace=True)
-
-        # We change the name of the variables/columns
-        rec.columns = (['date', 'grade'])
-
-        # Now we add a new variable/column "value", which we give the value 1 for each row in order to sum up the values based on the contents of "grade"
-        rec['value'] = 1
-
-        # Now we group by the content of "grade" and sum their respective values
-        rec = rec.groupby(['grade']).sum()
-        # The DataFrame "rec" has now 1 variable/column which is the value, the index are the different names from the variable "grade"
-        # However for the plotting we need the index as a variable
-        rec = rec.reset_index()
-
-        # For the labels we assign the content/names of the variable "grade" and for the values we assign the content of "values"
-        st.write(f'Analyst Recommendations of {name} Stock from {six_months} to {today}')
-        fig1, ax1 = plt.subplots(figsize=(16,9))
-        fig1.patch.set_facecolor('#0e1117')
-        ax1.pie(rec.value, labels=rec.grade, autopct='%1.1f%%', startangle=90)
-        ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-        plt.legend(labels=rec.grade)
-
-        st.pyplot(fig1)
 
 
 
@@ -306,13 +335,14 @@ def main():
         col3.metric("Сектор", series_info[4])
 
         col4, col5, col6 = st.columns(3)
-        col1.metric("Страна", series_info[5])
-        col2.metric("Биржа", series_info[6])
-        col3.metric("Валюта", series_info[7])
+        col4.metric("Страна", series_info[5])
+        col5.metric("Биржа", series_info[6])
+        col6.metric("Валюта", series_info[7])
 
         moving_avarage(ticker, start, end)
         Machine_learning(ticker, today)
         get_fundamental_data(ticker)
+
         analysis(ticker, today)
 
     except KeyError:
