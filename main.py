@@ -12,7 +12,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from urllib.request import urlopen, Request
 from bs4 import BeautifulSoup
-
+import string
 
 
 
@@ -189,7 +189,6 @@ def get_fundamental_data(name):
               'Forward P/E',
               'PEG',
               'Debt/Eq',
-              'EPS (ttm)',
               'Dividend %',
               'ROE',
               'ROI',
@@ -204,47 +203,82 @@ def get_fundamental_data(name):
         for m in df.columns:
             df.loc[name,m] = fundamental_metric(soup,m)
         st.write(df)
-        print(df)
+        df1 = df
+        df1['Dividend %'] = df1['Dividend %'].str.replace('%', '')
+        df1['ROE'] = df1['ROE'].str.replace('%', '')
+        df1['ROI'] = df1['ROI'].str.replace('%', '')
+        df1['EPS Q/Q'] = df1['EPS Q/Q'].str.replace('%', '')
+        df1 = df1.apply(pd.to_numeric, errors='coerce')
+
+        # Цена акции/прибыль на акцию. EPS - Отношение чистой прибыли на количество акций в обращении.
+        if (df1['P/E'].astype(float) > 20).any() == True:
+            st.write(f'Показатель P/E: {df1["P/B"].iloc[0]} %')
+            st.error('Компания может быть переоценена')
+        else:
+            st.write(f'Показатель P/E: {df1["P/B"].iloc[0]} %')
+            st.success('Компания может быть переоценена')
+
+        # Капитализация/Балансовую стоимость компании(чистые активы)
+        if (df1['P/B'].astype(float) < 0).any() == True:
+            st.write(f'Показатель P/B: {df1["P/B"].iloc[0]} %')
+            st.error(
+                'У компании долгов больше, чем собственных активов, может привести к банкротству, не стоит рассматривать такие компании для покупки')
+        elif (df1['P/B'].astype(float) > 0).any() == True and (df1['P/B'].astype(float) < 1).any() == True:
+            st.write(f'Показатель P/B: {df1["P/B"].iloc[0]} %')
+            st.success(
+                'Капитализация компании меньше ее собственного капитала, акции вы можете приобрести ее со скидкой')
+        elif (df1['P/B'].astype(float) == 1).any() == True:
+            st.write(f'Показатель P/B: {df1["P/B"].iloc[0]} %')
+            st.warning('Акция оценена справедливо')
+        else:
+            st.write(f'Показатель P/B: {df1["P/B"].iloc[0]} %')
+            st.warning('Капитализация компании большее ее собственного капитала, за акции вы переплачиваете')
+
+        # Дивидендная доходность
+        if (df1['Dividend %'].astype(float) == 0).any() == False:
+            st.write('Дивидендная доходность:')
+            st.warning('Компания не выплачивает дивиденды')
+        else:
+            st.write('Дивидендная доходность:')
+            st.success(f'Дивидендная доходность составляет:{df1["Dividend %"]}')
+
+        # Эффективност вложений. Сколько инвестор получает за вложенный рубль (доходы-затраты/затраты)*100
+        if (df1['ROI'].astype(float) > 100).any() == True:
+            st.write(f'Показатель ROI: {df1["ROI"].iloc[0]} %')
+            st.success('Бизнес окупился и приносит прибыль')
+        else:
+            st.write(f'Показатель ROI: {df1["ROI"].iloc[0]} %')
+            st.error('Инвестиции не окупились: компания вкладывает больше, чем получает')
+
+        # Рентабельность собственного капитала (Годовая чистая прибыль/среднегодовой собственный капитал)*100
+        # По сути процентная ставка
+        if (df1['ROE'].astype(float) > 17).any() == True:
+            st.write(f'Показатель ROE: {df1["ROE"].iloc[0]} %')
+            st.success('Компания привлекательная для покупки, так как ставка выше, чем дает банковский вклад')
+        else:
+            st.write(f'Показатель ROE: {df1["ROE"].iloc[0]} %')
+            st.warning('Не рекомендуется')
+
+        # Выгода от покупки (P/E)/EPS
+        if (df1['PEG'].astype(float) > 1).any() == True:
+            st.write(f'Показатель PEG: {df1["PEG"].iloc[0]} ')
+            st.error('Компания переоценена')
+        elif (df1['PEG'].astype(float) == 1).any() == True:
+            st.write(f'Показатель PEG: {df1["PEG"].iloc[0]} ')
+            st.warning('Компания оценена справедливо')
+        else:
+            st.write(f'Показатель PEG: {df1["PEG"].iloc[0]} ')
+            st.success('Компанию стоит рассматривать к покупке')
+
+        # Изменение прибыли на акцию
+        if (df1['EPS Q/Q'].astype(float) > 17).any() == True:
+            st.write(f'Показатель EPS Q/Q: {df1["EPS Q/Q"].iloc[0]} ')
+            st.success('Компания привлекательная для покупки, так как ставка выше, чем дает банковский вклад')
+        else:
+            st.write(f'Показатель EPS Q/Q: {df1["EPS Q/Q"].iloc[0]} ')
+            st.warning('Не рекомендуется')
     except Exception as e:
-        st.write(name, 'not found')
-    df1 = df
-    df1['Dividend %'] = df1['Dividend %'].str.replace('%', '')
-    df1['ROE'] = df1['ROE'].str.replace('%', '')
-    df1['ROI'] = df1['ROI'].str.replace('%', '')
-    df1['EPS Q/Q'] = df1['EPS Q/Q'].str.replace('%', '')
-    df1 = df1.apply(pd.to_numeric, errors='coerce')
-    if (df1['P/E'].astype(float) > 5).any() == True:
-        print('kek')
-    else:
-        print('re')
-    if (df1['P/B'].astype(float) > 5).any() == True:
-        print('kek1')
-    else:
-        print('re')
-    if (df1['Dividend %'].astype(float) == 0).any() == False:
-        print('Компания не выплачивает дивиденды')
-    else:
-        print(f'Дивидендная доходность составляет:{df1["Dividend %"]}')
-    if (df1['ROI'].astype(float) > 5).any() == True:
-        print('Показатель в норме')
-    else:
-        print('Ляля')
-    if (df1['ROE'].astype(float) > 5).any() == True:
-        print('Показатель в норме')
-    else:
-        print('Ляля')
-    if (df1['ROE'].astype(float) > 5).any() == True:
-        print('Показатель в норме')
-    else:
-        print('Ляля')
-    if (df1['EPS Q/Q'].astype(float) > 5).any() == True:
-        print('Показатель в норме')
-    else:
-        print('Ляля')
-    if (df1['Debt/Eq'].astype(float) > 5).any() == True:
-        print('kek')
-    else:
-        print('lol')
+        st.write(name, 'Данные по компании не найдены')
 
 
 
@@ -301,10 +335,10 @@ def analysis(name, today):
 
 def main():
     sp500_list = pd.read_csv('SP500_list.csv')
-    ticker = st.selectbox('Select the ticker if present in the S&P 500 index', sp500_list['Symbol'], index=26).upper()
+    ticker = st.selectbox('Select the ticker if present in the S&P 500 index', sp500_list['Symbol'], index=45).upper()
     pivot_sector = True
     checkbox_noSP = st.checkbox('Select this box to write the ticker (if not present in the S&P 500 list). \
-                                Deselect to come back to the S&P 500 index stock list')
+                                Deselect to come back to the S&P 500 index stock list', key = 1)
     if checkbox_noSP:
         ticker = st.text_input('Write the ticker (check it in yahoo finance)', 'MN.MI').upper()
         pivot_sector = False
@@ -327,7 +361,8 @@ def main():
 
         # Основная инфа о компании
         translator = Translator()
-        st.write(translator.translate(text=series_info[3], src='en', dest='ru'))
+        with st.expander('О компании:'):
+            st.caption(translator.translate(text=series_info[3], src='en', dest='ru'))
 
         col1, col2, col3 = st.columns(3)
         col1.metric("Тикер", series_info[0])
@@ -339,11 +374,18 @@ def main():
         col5.metric("Биржа", series_info[6])
         col6.metric("Валюта", series_info[7])
 
-        moving_avarage(ticker, start, end)
-        Machine_learning(ticker, today)
-        get_fundamental_data(ticker)
-
-        analysis(ticker, today)
+        checkbox_moving_avarage = st.checkbox('Отобразить временной график и технический анализ', key = 2)
+        if checkbox_moving_avarage:
+                moving_avarage(ticker, start, end)
+        checkbox_machine_learning = st.checkbox('Отобразить прогнозируемую, при помощи машинного обучения, цену', key = 3)
+        if checkbox_machine_learning:
+            Machine_learning(ticker, today)
+        checkbox_get_fundamental_data = st.checkbox('Отобразить фундаментальный анализ', key = 4)
+        if checkbox_get_fundamental_data:
+            get_fundamental_data(ticker)
+        checkbox_analysis = st.checkbox('Отобразить прогнозы аналитиков', key = 5)
+        if checkbox_analysis:
+            analysis(ticker, today)
 
     except KeyError:
         st.write('Try to input correct name')
