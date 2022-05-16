@@ -12,8 +12,6 @@ from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from urllib.request import urlopen, Request
 from bs4 import BeautifulSoup
-import string
-
 
 
 # Стиль
@@ -211,12 +209,15 @@ def get_fundamental_data(name):
         df1 = df1.apply(pd.to_numeric, errors='coerce')
 
         # Цена акции/прибыль на акцию. EPS - Отношение чистой прибыли на количество акций в обращении.
-        if (df1['P/E'].astype(float) > 20).any() == True:
-            st.write(f'Показатель P/E: {df1["P/B"].iloc[0]} %')
-            st.error('Компания может быть переоценена')
+        if (df1['P/E'].astype(float)).any() == False:
+            st.write(f'Показатель P/E:')
+            st.error('Компания с отрицательной прибылью')
+        elif (df1['P/E'].astype(float) > 20).any() == True:
+            st.write(f'Показатель P/E: {df1["P/E"].iloc[0]} %')
+            st.warning('Компания может быть переоценена')
         else:
-            st.write(f'Показатель P/E: {df1["P/B"].iloc[0]} %')
-            st.success('Компания может быть переоценена')
+            st.write(f'Показатель P/E: {df1["P/E"].iloc[0]} %')
+            st.success('Компанию стоит рассматривать к покупке')
 
         # Капитализация/Балансовую стоимость компании(чистые активы)
         if (df1['P/B'].astype(float) < 0).any() == True:
@@ -254,15 +255,18 @@ def get_fundamental_data(name):
         # По сути процентная ставка
         if (df1['ROE'].astype(float) > 17).any() == True:
             st.write(f'Показатель ROE: {df1["ROE"].iloc[0]} %')
-            st.success('Компания привлекательная для покупки, так как ставка выше, чем дает банковский вклад')
+            st.success('Компания привлекательная для покупки, так как может дать прибыль, чем дает банковский вклад')
         else:
             st.write(f'Показатель ROE: {df1["ROE"].iloc[0]} %')
             st.warning('Не рекомендуется')
 
         # Выгода от покупки (P/E)/EPS
-        if (df1['PEG'].astype(float) > 1).any() == True:
+        if (df1['PEG'].astype(float)).any() == False:
+            st.write(f'Показатель PEG:')
+            st.error('Компания с отрицательной прибылью')
+        elif (df1['PEG'].astype(float) > 1).any() == True:
             st.write(f'Показатель PEG: {df1["PEG"].iloc[0]} ')
-            st.error('Компания переоценена')
+            st.warning('Компания переоценена')
         elif (df1['PEG'].astype(float) == 1).any() == True:
             st.write(f'Показатель PEG: {df1["PEG"].iloc[0]} ')
             st.warning('Компания оценена справедливо')
@@ -273,7 +277,7 @@ def get_fundamental_data(name):
         # Изменение прибыли на акцию
         if (df1['EPS Q/Q'].astype(float) > 17).any() == True:
             st.write(f'Показатель EPS Q/Q: {df1["EPS Q/Q"].iloc[0]} ')
-            st.success('Компания привлекательная для покупки, так как ставка выше, чем дает банковский вклад')
+            st.success('Компания привлекательная для покупки, так как может дать прибыль, чем дает банковский вклад')
         else:
             st.write(f'Показатель EPS Q/Q: {df1["EPS Q/Q"].iloc[0]} ')
             st.warning('Не рекомендуется')
@@ -327,6 +331,7 @@ def analysis(name, today):
             plt.legend(labels=rec.grade)
 
             st.pyplot(fig1)
+
     except AttributeError:
         st.write("> Unfortunately, there are no recommendations by analysts provided for your chosen stock!")
 
