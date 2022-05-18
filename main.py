@@ -52,11 +52,6 @@ def moving_avarage(name, start_data, end_data):
     MACD = np.prod(1 + MACD_return) ** (252 / len(MACD_return))
     RSI = np.prod(1 + RSI_return) ** (252 / len(RSI_return))
 
-
-
-    st.write('Доходность риск стратегии Buy-and-hold ' + str(round(BnH * 100, 2)) + "%")
-    st.write('Доходность риск стратегии скользящих средних ' + str(round(MACD * 100, 2)) + "%")
-    st.write('Доходность риск стратегии RSI ' + str(round(RSI * 100, 2)) + "%")
     data['RSI_sold'] = np.nan
     data['RSI_buy'] = np.nan
     data['buy_signal'] = np.nan
@@ -69,31 +64,36 @@ def moving_avarage(name, start_data, end_data):
             data['RSI_buy'][i] = data['RSI'][i]
             data['buy_signal'][i] = data['Close'][i]
 
+    st.write('Доходность риск стратегии RSI ' + str(round(RSI * 100, 2)) + "%")
+    ##График RSI
     plt.style.use('dark_background')
     fig, axs = plt.subplots(2, sharex=True, figsize=(13, 9))
     fig.suptitle('RSI Стратегия')
-    ## Chart the stock close price & buy/sell signals:
+    ## Покупка продажа на основном графике:
     axs[0].scatter(data.index, data['buy_signal'], color='green', marker='^', alpha=1)
     axs[0].scatter(data.index, data['sold_signal'], color='red', marker='v', alpha=1)
     axs[0].plot(data['Adj Close'], alpha=0.8)
     axs[0].grid()
-
-    ## Chart RSI & buy/sell signals:
+    ## Покупка продажа на графике RSI
     axs[1].scatter(data.index, data['RSI_buy'], color='green', marker='^', alpha=1)
     axs[1].scatter(data.index, data['RSI_sold'], color='red', marker='v', alpha=1)
     axs[1].plot(data['RSI'], alpha=0.8)
     axs[1].grid()
-
     st.pyplot(fig)
 
-    plt.figure(figsize=(14, 8))
+    ##Скользящие средние
+    st.write('Доходность риск стратегии скользящих средних ' + str(round(MACD * 100, 2)) + "%")
+    fig1 = plt.figure(figsize=(14, 8))
+    fig1.suptitle('MACD Стратегия')
     plt.style.use('dark_background')
-    plt.plot(data.index, data['MA' + str(short_ma)], label='FB MACD', color='blue')
-    plt.plot(data.index, data['MA' + str(long_ma)], label='Signal Line', color='red')
+    plt.plot(data.index, data['MA' + str(short_ma)], label='MA5', color='blue')
+    plt.plot(data.index, data['MA' + str(long_ma)], label='MA12', color='red')
     plt.xticks(rotation=45)
     plt.legend(loc='upper left')
-    st.pyplot(fig)
+    st.pyplot(fig1)
 
+
+    st.write('Доходность риск стратегии Buy-and-hold ' + str(round(BnH * 100, 2)) + "%")
     return st.dataframe(data), st.line_chart(data[['Close', 'MA12', 'MA5']])
 
 
