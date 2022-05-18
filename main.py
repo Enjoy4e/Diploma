@@ -31,8 +31,7 @@ def moving_avarage(name, start_data, end_data):
     rsi_period = 14
     rsi_oversold = 30
     rsi_overbought = 70
-    sr_sell = 0.7
-    sr_buy = 0.3
+
     data['MA' + str(short_ma)] = data["Close"].rolling(short_ma).mean()
     data['MA' + str(long_ma)] = data["Close"].rolling(long_ma).mean()
     data['return'] = data['Close'].pct_change()
@@ -40,52 +39,75 @@ def moving_avarage(name, start_data, end_data):
     data['Down'] = np.maximum(-data['Close'].diff(), 0)
     data['RS'] = data['Up'].rolling(rsi_period).mean() / data['Down'].rolling(rsi_period).mean()
     data['RSI'] = 100 - 100 / (1 + data['RS'])
-    data['S&R'] = (data['Close']) / (10 ** np.floor(np.log10(data['Close']))) % 1
 
     start = max(long_ma, rsi_period)
     data['MACD_signal'] = 2 * (data['MA' + str(short_ma)] > data['MA' + str(long_ma)]) - 1
     data['RSI_signal'] = 1 * (data['RSI'] < rsi_oversold) - 1 * (data['RSI'] > rsi_overbought)
-    data['S&R_signal'] = 1 * (data['S&R'] < sr_buy) - 1 * (data['S&R'] > 0.7)
 
     BnH_return = np.array(data['return'][start + 1:])
     MACD_return = np.array(data['return'][start + 1:]) * np.array(data['MACD_signal'][start:-1])
     RSI_return = np.array(data['return'][start + 1:]) * np.array(data['RSI_signal'][start:-1])
-    SnR_return = np.array(data['return'][start + 1:]) * np.array(data['S&R_signal'][start:-1])
 
     BnH = np.prod(1 + BnH_return) ** (252 / len(BnH_return))
     MACD = np.prod(1 + MACD_return) ** (252 / len(MACD_return))
     RSI = np.prod(1 + RSI_return) ** (252 / len(RSI_return))
-    SnR = np.prod(1 + SnR_return) ** (252 / len(SnR_return))
 
-    BnH_risk = np.std(BnH_return) * (252) ** (1 / 2)
-    MACD_risk = np.std(MACD_return) * (252) ** (1 / 2)
-    RSI_risk = np.std(RSI_return) * (252) ** (1 / 2)
-    SnR_risk = np.std(SnR_return) * (252) ** (1 / 2)
 
-    st.write('Доходность риск стратегии Buy-and-hold ' + str(round(BnH * 100, 2)) + '% и ' + str(
-        round(BnH_risk * 100, 2)) + '%')
-    st.write('Доходность риск стратегии скользящих средних ' + str(round(MACD * 100, 2)) + '% и ' + str(
-        round(MACD_risk * 100, 2)) + '%')
-    st.write('Доходность риск стратегии RSI ' + str(round(RSI * 100, 2)) + '% и ' + str(round(RSI_risk * 100, 2)) + '%')
-    st.write('Доходность риск стратегии поддержки и сопротивления ' + str(round(SnR * 100, 2)) + '% и ' + str(
-        round(SnR_risk * 100, 2)) + '%')
+
+    st.write('Доходность риск стратегии Buy-and-hold ' + str(round(BnH * 100, 2)) + "%")
+    st.write('Доходность риск стратегии скользящих средних ' + str(round(MACD * 100, 2)) + "%")
+    st.write('Доходность риск стратегии RSI ' + str(round(RSI * 100, 2)) + "%")
+    data['RSI_sold'] = np.nan
+    data['RSI_buy'] = np.nan
+    data['buy_signal'] = np.nan
+    data['sold_signal'] = np.nan
+    for i in range(1,len(data)):
+        if data['RSI_signal'][i] == -1:
+            data['RSI_sold'][i] = data['RSI'][i]
+            data['sold_signal'][i] = data['Close'][i]
+        elif data['RSI_signal'][i] == 1:
+            data['RSI_buy'][i] = data['RSI'][i]
+            data['buy_signal'][i] = data['Close'][i]
+
+    plt.style.use('dark_background')
+    fig, axs = plt.subplots(2, sharex=True, figsize=(13, 9))
+    fig.suptitle('RSI Стратегия')
+    ## Chart the stock close price & buy/sell signals:
+    axs[0].scatter(data.index, data['buy_signal'], color='green', marker='^', alpha=1)
+    axs[0].scatter(data.index, data['sold_signal'], color='red', marker='v', alpha=1)
+    axs[0].plot(data['Adj Close'], alpha=0.8)
+    axs[0].grid()
+
+    ## Chart RSI & buy/sell signals:
+    axs[1].scatter(data.index, data['RSI_buy'], color='green', marker='^', alpha=1)
+    axs[1].scatter(data.index, data['RSI_sold'], color='red', marker='v', alpha=1)
+    axs[1].plot(data['RSI'], alpha=0.8)
+    axs[1].grid()
+
+    st.pyplot(fig)
+
+    plt.figure(figsize=(14, 8))
+    plt.style.use('dark_background')
+    plt.plot(data.index, data['MA' + str(short_ma)], label='FB MACD', color='blue')
+    plt.plot(data.index, data['MA' + str(long_ma)], label='Signal Line', color='red')
+    plt.xticks(rotation=45)
+    plt.legend(loc='upper left')
+    st.pyplot(fig)
 
     return st.dataframe(data), st.line_chart(data[['Close', 'MA12', 'MA5']])
 
 
 # Reinforcement Learning
-def Reinforcement_learning(name):
+def LSTM(name):
     pass
 
 def Machine_learning(name, today):
-
-    # Get the stock data, starting from 2000-01-01 to today
+    # Получение данных
     df = datas.DataReader(name, 'yahoo', '2000-01-01', today)
-    # For the prediction we only need the column/variable "Adj Close"
+    # Закрытие
     df = df[['Adj Close']]
 
-    # Creating a variable "n" for predicting the amount of days in the future
-    # We predict the stock price 30 days in the future
+    # Количество дней для которых будем пытаться определить котировки
     n = 30
 
     # Create another column "Prediction" shifted "n" units up
@@ -181,6 +203,7 @@ def Machine_learning(name, today):
 def fundamental_metric(soup, metric):
     return soup.find(text=metric).find_next(class_='snapshot-td2').text
 
+
 def get_fundamental_data(name):
     metric = ['P/B',
               'P/E',
@@ -236,12 +259,12 @@ def get_fundamental_data(name):
             st.warning('Капитализация компании большее ее собственного капитала, за акции вы переплачиваете')
 
         # Дивидендная доходность
-        if (df1['Dividend %'].astype(float) == 0).any() == False:
+        if (df1['Dividend %']).any() == False:
             st.write('Дивидендная доходность:')
             st.warning('Компания не выплачивает дивиденды')
         else:
             st.write('Дивидендная доходность:')
-            st.success(f'Дивидендная доходность составляет:{df1["Dividend %"]}')
+            st.success(f'Дивидендная доходность составляет:{df1["Dividend %"].iloc[0]}')
 
         # Эффективност вложений. Сколько инвестор получает за вложенный рубль (доходы-затраты/затраты)*100
         if (df1['ROI'].astype(float) > 100).any() == True:
@@ -255,10 +278,10 @@ def get_fundamental_data(name):
         # По сути процентная ставка
         if (df1['ROE'].astype(float) > 17).any() == True:
             st.write(f'Показатель ROE: {df1["ROE"].iloc[0]} %')
-            st.success('Компания привлекательная для покупки, так как может дать прибыль, чем дает банковский вклад')
+            st.success('Компания привлекательная для покупки, так как может дать прибыль больше, чем дает банковский вклад')
         else:
             st.write(f'Показатель ROE: {df1["ROE"].iloc[0]} %')
-            st.warning('Не рекомендуется')
+            st.warning('Низкая прибыль')
 
         # Выгода от покупки (P/E)/EPS
         if (df1['PEG'].astype(float)).any() == False:
@@ -277,12 +300,12 @@ def get_fundamental_data(name):
         # Изменение прибыли на акцию
         if (df1['EPS Q/Q'].astype(float) > 17).any() == True:
             st.write(f'Показатель EPS Q/Q: {df1["EPS Q/Q"].iloc[0]} ')
-            st.success('Компания привлекательная для покупки, так как может дать прибыль, чем дает банковский вклад')
+            st.success('Компания привлекательная для покупки, так как может дать прибыль больше, чем дает банковский вклад')
         else:
             st.write(f'Показатель EPS Q/Q: {df1["EPS Q/Q"].iloc[0]} ')
-            st.warning('Не рекомендуется')
+            st.warning('Низкая прибыль')
     except Exception as e:
-        st.write(name, 'Данные по компании не найдены')
+        st.error(name, 'Данные по компании не найдены')
 
 
 
@@ -333,10 +356,7 @@ def analysis(name, today):
             st.pyplot(fig1)
 
     except AttributeError:
-        st.write("> Unfortunately, there are no recommendations by analysts provided for your chosen stock!")
-
-
-
+        st.error("Нет еще ни одной рекомендации от аналитиков")
 
 def main():
     sp500_list = pd.read_csv('SP500_list.csv')
