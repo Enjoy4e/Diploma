@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 import matplotlib.pyplot as plt
 from googletrans import Translator
@@ -44,11 +45,10 @@ def moving_avarage(name, start_data, end_data):
     data['MACD_signal'] = 2 * (data['MA' + str(short_ma)] > data['MA' + str(long_ma)]) - 1
     data['RSI_signal'] = 1 * (data['RSI'] < rsi_oversold) - 1 * (data['RSI'] > rsi_overbought)
 
-    BnH_return = np.array(data['return'][start + 1:])
     MACD_return = np.array(data['return'][start + 1:]) * np.array(data['MACD_signal'][start:-1])
     RSI_return = np.array(data['return'][start + 1:]) * np.array(data['RSI_signal'][start:-1])
 
-    BnH = np.prod(1 + BnH_return) ** (252 / len(BnH_return))
+    BnH = data['Close'][-1]*100/data['Close'][0]
     MACD = np.prod(1 + MACD_return) ** (252 / len(MACD_return))
     RSI = np.prod(1 + RSI_return) ** (252 / len(RSI_return))
 
@@ -63,8 +63,10 @@ def moving_avarage(name, start_data, end_data):
         elif data['RSI_signal'][i] == 1:
             data['RSI_buy'][i] = data['RSI'][i]
             data['buy_signal'][i] = data['Close'][i]
-
-    st.write('Доходность риск стратегии RSI ' + str(round(RSI * 100, 2)) + "%")
+    if round(RSI * 100, 2) > 100:
+        st.success('Доходность риск стратегии RSI ' + str(round(RSI * 100, 2)) + "%")
+    else:
+        st.error('Доходность риск стратегии RSI ' + str(round(RSI * 100, 2)) + "%")
     ##График RSI
     plt.style.use('dark_background')
     fig, axs = plt.subplots(2, sharex=True, figsize=(13, 9))
@@ -82,7 +84,11 @@ def moving_avarage(name, start_data, end_data):
     st.pyplot(fig)
 
     ##Скользящие средние
-    st.write('Доходность риск стратегии скользящих средних ' + str(round(MACD * 100, 2)) + "%")
+    if round(MACD * 100, 2) > 100:
+        st.success('Доходность риск стратегии скользящих средних ' + str(round(MACD * 100, 2)) + "%")
+    else:
+        st.error('Доходность риск стратегии скользящих средних ' + str(round(MACD * 100, 2)) + "%")
+
     fig1 = plt.figure(figsize=(14, 8))
     fig1.suptitle('MACD Стратегия')
     plt.style.use('dark_background')
@@ -92,8 +98,11 @@ def moving_avarage(name, start_data, end_data):
     plt.legend(loc='upper left')
     st.pyplot(fig1)
 
+    if round(BnH,2) > 100:
+        st.success('Доходность риск стратегии Buy-and-hold ' + str(round(BnH, 2)) + "%")
+    else:
+        st.error('Доходность риск стратегии Buy-and-hold ' + str(round(BnH, 2)) + "%")
 
-    st.write('Доходность риск стратегии Buy-and-hold ' + str(round(BnH * 100, 2)) + "%")
     return st.dataframe(data), st.line_chart(data[['Close', 'MA12', 'MA5']])
 
 
@@ -193,7 +202,7 @@ def Machine_learning(name, today):
         line=dict(color='red', dash='dot'),
         opacity=0.9))
 
-    fig.update_layout(title=f'Stock Forecast of {name} Stock for the next 30 days',
+    fig.update_layout(title=f'Прогнорование цен акций {name} на следующий месяц',
                       yaxis_title='Adjusted Closing Price',
                       xaxis_tickfont_size=14,
                       yaxis_tickfont_size=14)
@@ -320,7 +329,7 @@ def analysis(name, today):
     Analitics_rec = data.recommendations
     try:
         if Analitics_rec.empty:
-            st.write("> Unfortunately, there are no recommendations by analysts provided for your chosen stock!")
+            st.write("За заданный промежуток времени нет ни одной рекомендации от аналитика")
         # The DataFrame "rec" has 4 columns: "Firm", "To Grade", "From Grade" and "Action"
         # The index is the date ("DatetimeIndex")
         # Now we select only those columns which have the index(date) from "six months" to "today"
@@ -346,7 +355,7 @@ def analysis(name, today):
             rec = rec.reset_index()
 
             # For the labels we assign the content/names of the variable "grade" and for the values we assign the content of "values"
-            st.write(f'Analyst Recommendations of {name} Stock from {six_months} to {today}')
+            st.write(f'Рекомендации аналитиков на акции {name} от {six_months} по {today}')
             fig1, ax1 = plt.subplots(figsize=(16,9))
             fig1.patch.set_facecolor('#0e1117')
             ax1.pie(rec.value, labels=rec.grade, autopct='%1.1f%%', startangle=90)
@@ -360,60 +369,95 @@ def analysis(name, today):
 
 def main():
     sp500_list = pd.read_csv('SP500_list.csv')
-    ticker = st.selectbox('Select the ticker if present in the S&P 500 index', sp500_list['Symbol'], index=45).upper()
+    ticker = st.selectbox('Выберите тикер компании из списка компаний S&P500', sp500_list['Symbol'], index=45).upper()
     pivot_sector = True
-    checkbox_noSP = st.checkbox('Select this box to write the ticker (if not present in the S&P 500 list). \
-                                Deselect to come back to the S&P 500 index stock list', key = 1)
+    checkbox_noSP = st.checkbox('Выберите данный пункт и введите название тикера компании (если она не представлена в списке S&P500). \
+                                Отменить выбор - вернуться к списку S&P500', key = 1)
     if checkbox_noSP:
-        ticker = st.text_input('Write the ticker (check it in yahoo finance)', 'MN.MI').upper()
+        ticker = st.text_input('Введите название тикера (лучше проверить на сайте Yahoo Finance)', 'MN.MI').upper()
         pivot_sector = False
 
     # Задаем диапазон дат
-    start = st.text_input('Enter the start date in yyyy-mm-dd format:', '2021-01-01')
+    kek = True
+    kek1 = True
+    st.subheader('Задаем диапазон для анализа')
+    start = st.text_input('Введите стартовую дату в формате yyyy-mm-dd:', '2021-01-01')
+    try:
+        time.strptime(start, "%Y-%m-%d")
+    except ValueError:
+        kek = False
+        st.error('Введите корректную начальную дату!')
     today = date.today()
     today = today.strftime('%Y-%m-%d')
-    end = st.text_input('Enter the end date in yyyy-mm-dd format:', today)
-
+    end = st.text_input('Введите конечную дату в формте yyyy-mm-dd:', today)
     try:
-        ticker_meta = yf.Ticker(ticker)
+        time.strptime(end, "%Y-%m-%d")
+    except ValueError:
+        kek1 = False
+        st.error('Введите корректную конечную дату!')
+    if kek1 == True and kek == True and start < end:
+        try:
+            ticker_meta = yf.Ticker(ticker)
 
-        series_info = pd.Series(ticker_meta.info)
-        series_info = series_info.loc[
-            ['symbol', 'shortName', 'financialCurrency', 'longBusinessSummary', 'sector', 'country',
-             'exchangeTimezoneName', 'currency', 'quoteType']]
-        # test = series_info.astype(str)
-        # st.dataframe(test)
+            series_info = pd.Series(ticker_meta.info)
+            series_info = series_info.loc[
+                ['symbol', 'shortName', 'financialCurrency', 'longBusinessSummary', 'sector', 'country',
+                 'exchangeTimezoneName', 'currency', 'quoteType']]
+            # test = series_info.astype(str)
+            # st.dataframe(test)
 
-        # Основная инфа о компании
-        translator = Translator()
-        with st.expander('О компании:'):
-            st.caption(translator.translate(text=series_info[3], src='en', dest='ru'))
+            # Основная инфа о компании
+            translator = Translator()
+            with st.expander('О компании:'):
+                st.caption(translator.translate(text=series_info[3], src='en', dest='ru'))
 
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Тикер", series_info[0])
-        col2.metric("Название", series_info[1])
-        col3.metric("Сектор", series_info[4])
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.write("Тикер")
+                st.subheader(series_info[0])
+            with col2:
+                st.write("Полное название")
+                st.subheader(series_info[1])
+            with col3:
+                st.write("Сектор")
+                st.subheader(series_info[4])
 
-        col4, col5, col6 = st.columns(3)
-        col4.metric("Страна", series_info[5])
-        col5.metric("Биржа", series_info[6])
-        col6.metric("Валюта", series_info[7])
+            col4, col5, col6 = st.columns(3)
+            with col4:
+                st.write("Страна")
+                st.subheader(series_info[5])
+            with col5:
+                st.write("Биржа")
+                st.subheader(series_info[6])
+            with col6:
+                st.write("Валюта")
+                st.subheader(series_info[7])
 
-        checkbox_moving_avarage = st.checkbox('Отобразить временной график и технический анализ', key = 2)
-        if checkbox_moving_avarage:
-                moving_avarage(ticker, start, end)
-        checkbox_machine_learning = st.checkbox('Отобразить прогнозируемую, при помощи машинного обучения, цену', key = 3)
-        if checkbox_machine_learning:
-            Machine_learning(ticker, today)
-        checkbox_get_fundamental_data = st.checkbox('Отобразить фундаментальный анализ', key = 4)
-        if checkbox_get_fundamental_data:
-            get_fundamental_data(ticker)
-        checkbox_analysis = st.checkbox('Отобразить прогнозы аналитиков', key = 5)
-        if checkbox_analysis:
-            analysis(ticker, today)
+            st.markdown("---")
+            checkbox_moving_avarage = st.checkbox('Отобразить временной график и технический анализ', key = 2)
+            if checkbox_moving_avarage:
+                    moving_avarage(ticker, start, end)
+            st.markdown("---")
+            checkbox_machine_learning = st.checkbox('Отобразить прогнозируемую, при помощи машинного обучения, цену', key = 3)
+            if checkbox_machine_learning:
+                Machine_learning(ticker, today)
+            st.markdown("---")
+            checkbox_get_fundamental_data = st.checkbox('Отобразить фундаментальный анализ', key = 4)
+            try:
+                if checkbox_get_fundamental_data:
+                    get_fundamental_data(ticker)
+                st.markdown("---")
+                checkbox_analysis = st.checkbox('Отобразить прогнозы аналитиков', key = 5)
+                if checkbox_analysis:
+                    analysis(ticker, today)
+                st.markdown("---")
+            except TypeError:
+                st.warning('Данные по акции не найдены')
 
-    except KeyError:
-        st.write('Try to input correct name')
+        except KeyError:
+            st.warning('Введите корректное название')
+    else:
+        st.error('Введите верный временной диапозон!')
 
 
 
