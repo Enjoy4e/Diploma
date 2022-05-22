@@ -241,7 +241,7 @@ def get_fundamental_data(name):
         df1 = df1.apply(pd.to_numeric, errors='coerce')
 
         # Цена акции/прибыль на акцию. EPS - Отношение чистой прибыли на количество акций в обращении.
-        if (df1['P/E'].astype(float)).any() == False:
+        if (df1['P/E'].astype(float) < 0).any() == False:
             st.write(f'Показатель P/E:')
             st.error('Компания с отрицательной прибылью')
         elif (df1['P/E'].astype(float) > 20).any() == True:
@@ -273,7 +273,7 @@ def get_fundamental_data(name):
             st.warning('Компания не выплачивает дивиденды')
         else:
             st.write('Дивидендная доходность:')
-            st.success(f'Дивидендная доходность составляет:{df1["Dividend %"].iloc[0]}')
+            st.success(f'Дивидендная доходность составляет:{df1["Dividend %"].iloc[0]}%')
 
         # Эффективност вложений. Сколько инвестор получает за вложенный рубль (доходы-затраты/затраты)*100
         if (df1['ROI'].astype(float) > 100).any() == True:
@@ -435,20 +435,37 @@ def main():
 
             st.markdown("---")
             checkbox_moving_avarage = st.checkbox('Отобразить временной график и технический анализ', key = 2)
-            if checkbox_moving_avarage:
-                    moving_avarage(ticker, start, end)
-            st.markdown("---")
-            checkbox_machine_learning = st.checkbox('Отобразить прогнозируемую, при помощи машинного обучения, цену', key = 3)
-            if checkbox_machine_learning:
-                Machine_learning(ticker, today)
-            st.markdown("---")
+            try:
+                if checkbox_moving_avarage:
+                        with st.expander('Описание:'):
+                            st.caption('- RSI (индекс относительной силы), определяющий (уровень падения цены, абсолютную величину ее роста)' )
+                            st.caption('- MACD – это, по своему, уникальный индикатор, поскольку сочетает в себе качества трендового индикатора и осциллятора. '
+                                       'С его помощью можно определить дальнейшее направление цены, потенциальную силу ценового движения, а также точки возможного разворота тренда.')
+                        moving_avarage(ticker, start, end)
+
+                st.markdown("---")
+                checkbox_machine_learning = st.checkbox('Отобразить прогнозируемую, при помощи машинного обучения, цену', key = 3)
+                if checkbox_machine_learning:
+                    with st.expander('Описание:'):
+                        st.caption('Прогноз цены основан на прошлых значениях акций. Прогнозирование выполняется с использованием модели линейной регрессии на основе прошлых данных. '
+                            'Линейная регрессия - это простой метод, который довольно легко интерпретировать, но у него есть несколько очевидных недостатков. '
+                            'Одна из проблем при использовании алгоритмов регрессии заключается в том, что модель перестраивается под столбец даты и месяца. '
+                            'Вместо того, чтобы учитывать предыдущие значения с точки зрения прогнозирования, модель будет учитывать значение с той же даты месяц назад или с той же даты/месяца год назад.')
+                    Machine_learning(ticker, today)
+                st.markdown("---")
+            except IndexError:
+                st.warning('Повторите запрос')
             checkbox_get_fundamental_data = st.checkbox('Отобразить фундаментальный анализ', key = 4)
             try:
                 if checkbox_get_fundamental_data:
                     get_fundamental_data(ticker)
+                    with st.expander('Описание:'):
+                        st.caption('Выбраны основные показатели, благодаря которым, можно определить дальнейшую перспективу компании.')
                 st.markdown("---")
                 checkbox_analysis = st.checkbox('Отобразить прогнозы аналитиков', key = 5)
                 if checkbox_analysis:
+                    with st.expander('Описание:'):
+                        st.caption('Прогнозы аналитиков за 6 месяцев')
                     analysis(ticker, today)
                 st.markdown("---")
             except TypeError:
